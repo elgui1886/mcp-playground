@@ -11,7 +11,11 @@ build/
 .env.production
 
 # IDE files
-.vscode/
+.vscode/*
+!.vscode/mcp.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
 .idea/
 *.swp
 *.swo
