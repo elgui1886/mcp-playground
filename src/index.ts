@@ -2,64 +2,51 @@ import {
   McpServer,
   ResourceTemplate,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { z } from "zod";
 
+// Create an MCP server
 const server = new McpServer({
-  name: "Example Server",
+  name: "Demo",
   version: "1.0.0",
-  description: "An example server using Model Context Protocol",
 });
 
-server.registerTool(
-  "my-first-tool",
-  {
-    title: "My First Tool",
-    description: "A simple tool that does something",
-    inputSchema: { a: z.number(), b: z.number() },
-    annotations: {
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-      readOnlyHint: true,
-      title: "My First Tool",
+// Add an addition tool
+server.tool("add", { a: z.number(), b: z.number() }, async ({ a, b }) => ({
+  content: [{ type: "text", text: String(a + b) }],
+}));
+
+// Add a dynamic greeting resource
+server.resource(
+  "file",
+  // The 'list' parameter controls how the resource lists available files. Setting it to undefined disables listing for this resource.
+  new ResourceTemplate("file://{path}", { list: undefined }),
+  async (uri, { path }) => ({
+    contents: [
+      {
+        uri: uri.href,
+        text: `File, ${path}!`,
+      },
+    ],
+  })
+);
+
+server.prompt("review-code", { code: z.string() }, ({ code }) => ({
+  messages: [
+    {
+      role: "user",
+      content: {
+        type: "text",
+        text: `Please review this code:\n\n${code}`,
+      },
     },
-  },
-  async ({ a, b }) => {
-    // Simulate some processing
-    const result = `Processed input: ${String(a + b)}`;
-    return {
-      content: [
-        {
-          type: "text",
-          text: result,
-        },
-      ],
-    };
-  }
-);
+  ],
+}));
 
-const resourceTemplate = new ResourceTemplate("lista://{nome}", {
-  list: undefined,
+// Start receiving messages on stdin and sending messages on stdout
+const transport = new StreamableHTTPServerTransport({
+  allowedHosts: ["localhost:3000"],
+  sessionIdGenerator: () => "session-id"
 });
-server.registerResource(
-  "my-first-resource",
-  resourceTemplate,
-  {
-    title: "my-first-resource",
-    description: "My first resource",
-  },
-  async (uri, variables) => {
-    return {
-      contents: [
-        {
-          uri: uri.href,
-          text: `Hello, ${variables.nome}!`,
-        },
-      ],
-    };
-  }
-);
-
-const transport = new StdioServerTransport();
-server.connect(transport);
+await server.connect(transport);
